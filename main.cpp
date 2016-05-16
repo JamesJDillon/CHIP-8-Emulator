@@ -1,9 +1,8 @@
 #include <iostream>
 #include <algorithm>
 #include <string>
-#include <fstream>
-// #include <cstdio>
-// #include <cstdlib>
+#include <cstdio>
+#include <cstdlib>
 
 class Chip8 {
 private:
@@ -21,36 +20,49 @@ private:
     unsigned short stack_pointer;
     unsigned char keys[16];
 public:
+    void print_mem();
     void load_ROM(std::string);
     void initialize();
 };
 
+void Chip8::print_mem() {
+    for (size_t i = 0; i < (sizeof(memory) / sizeof(memory[0])); i++) {
+        std::cout << std::hex << memory[i] << std::endl;
+    }
+}
+
 void Chip8::load_ROM(std::string filename) {
+    std::cout << filename << std::endl;
 
-    std::ifstream rom;
-    rom.open(filename.c_str(), std::ifstream::binary);
+    FILE *rom = std::fopen(filename.c_str(), "rb");
 
+    fseek(rom, 0, SEEK_END);
+    long filesize = ftell(rom);
+    rewind(rom);
 
-    while (rom >> std::hex >> a) {
-        std::cout << c << std::endl;
+    std::cout << "Filesize: " << filesize << std::endl;
+
+    char *buff = (char*)malloc(sizeof(char) * filesize);
+
+    if (buff == NULL) {
+        std::cout << "ERROR ALLOCATING MEMORY!" << std::endl;
     }
 
-    rom.close();
-    // std::cout << filename << std::endl;
-
-    // FILE *rom;
-    // rom = std::fopen(filename.c_str(), "r+b");
-
-    // fseek(rom, 0, SEEK_END);
-    // int size = ftell(rom);
-    // fseek(rom, 0, SEEK_SET);
+    int result = fread(buff, 1, filesize, rom);
+    if (result != filesize) {
+        std::cout << "ERROR READING ROM!" << std::endl;
+        return;
+    }
 
 
-    // int c;
-    // while ((c = std::fgetc(rom)) != EOF) {
-    //     memory[]
-    //     std::cout << std::hex << c << std::endl;
-    // }
+    if (filesize < (4096 - 512)) {
+        for (int i = 0; i < filesize; i++) {
+            memory[i + 512] = buff[i];
+        }
+    }
+
+    fclose(rom);
+    free(buff);
 }
 
 
@@ -61,16 +73,16 @@ void Chip8::initialize() {
     stack_pointer = 0;
 
     for (size_t i = 0; i < (sizeof(memory) / sizeof(memory[0])); i++) {
-        memory[i] = 0x0;
+        memory[i] = 0;
         //std::cout << +memory[i] << std::endl;
     }
 
     for (size_t i = 0; i < (sizeof(graphics) / sizeof(graphics[0])); i++) {
-        graphics[i] = 0x0;
+        graphics[i] = 0;
     }
 
     for (size_t i = 0; i < (sizeof(stack) / sizeof(stack[0])); i++) {
-        stack[i] = 0x0;
+        stack[i] = 0;
     } 
 }
 
@@ -80,4 +92,5 @@ int main()
     Chip8 chip;
     chip.initialize();
     chip.load_ROM("PONG");
+    //chip.print_mem();
 }
