@@ -123,6 +123,7 @@ void Chip8::cycle() {
                 default:
                     std::cout << "Unknown opcode: " << opcode << std::endl;
             }
+        break;
 
         case 0x1000:
             program_counter = opcode & 0x0FFF;
@@ -169,13 +170,164 @@ void Chip8::cycle() {
             memory[(opcode & 0x0F00) >> 8] = memory[(opcode & 0x0F00) >> 8] + memory[(opcode & 0x00FF)];
             program_counter += 2;
         break;
+
+        case 0x8000:
+            switch (opcode & 0x000F) {
+                case 0x0000:
+                    registers[(opcode & 0x0F00) >> 8] = registers[(opcode & 0x00F0) >> 4];
+                    program_counter += 2;
+                break;
+
+                case 0x0001:
+                    registers[(opcode & 0x0F00) >> 8] |= registers[(opcode & 0x00F0) >> 4];
+                    program_counter += 2;                    
+                break;
+
+                case 0x0002:
+                    registers[(opcode & 0x0F00) >> 8] &= registers[(opcode & 0x00F0) >> 4];
+                    program_counter += 2;                    
+                break;
+
+                case 0x0003:
+                    registers[(opcode & 0x0F00) >> 8] ^= registers[(opcode & 0x00F0) >> 4];
+                    program_counter += 2;                    
+                break;
+
+                case 0x0004:
+                    if(registers[(opcode & 0x00F0) >> 4] > (0xFF - registers[(opcode & 0x0F00) >> 8])) {
+                        registers[0xF] = 1;
+                    } else {
+                        registers[0xF] = 0;  
+                    }
+
+                    registers[(opcode & 0x0F00) >> 8] += registers[(opcode & 0x00F0) >> 4];
+                    program_counter += 2;                       
+                break;
+
+                case 0x0005:
+                    if(registers[(opcode & 0x00F0) >> 4] > (0xFF - registers[(opcode & 0x0F00) >> 8])) {
+                        registers[0xF] = 0;
+                    } else {
+                        registers[0xF] = 1;  
+                    }
+
+                    registers[(opcode & 0x0F00) >> 8] -= registers[(opcode & 0x00F0) >> 4];
+                    program_counter += 2;                  
+                break;
+
+                case 0x0006:
+                    registers[0xF] = registers[(opcode & 0x0F00) >> 8] & 0x1;
+                    registers[(opcode & 0x0F00) >> 8] >>= 1;
+                    program_counter += 2;                   
+                break;
+
+                case 0x0007:
+                    if(registers[(opcode & 0x0F00) >> 8] > registers[(opcode & 0x00F0) >> 4]) {
+                        registers[0xF] = 0;
+                    } else {
+                        registers[0xF] = 1;  
+                    }
+
+                    registers[(opcode & 0x0F00) >> 8] = registers[(opcode & 0x00F0) >> 4] - registers[(opcode & 0x0F00) >> 8];
+                    program_counter += 2;    
+                break;
+
+                case 0x000E:
+                    registers[0xF] = registers[(opcode & 0x0F00) >> 8] >> 7;
+                    registers[(opcode & 0x0F00) >> 8] <<= 1;
+                    program_counter += 2;
+                break;
+
+                default:
+                    std::cout << "Unknown opcode: " << std::hex << opcode << std::endl;
+                    break;
+            }
+        break;
+
+        case 0x9000:
+            if (registers[(opcode & 0x0F00) >> 8] != registers[(opcode & 0x00F0) >> 4]) {
+                program_counter += 4;
+            } else {
+                program_counter += 2;
+            }
+        break;
+
         case 0xA000:
             index = opcode & 0x0FFF;
             program_counter += 2;
         break;
 
+        case 0xB000:
+            program_counter = (opcode & 0x0FFF) + registers[0];
+        break;
+
+        case 0xC000:
+            registers[(opcode & 0x0F00) >> 8] = (rand() % 0xFF) & (opcode & 0x00FF);
+            program_counter += 2;
+        break;
+
+        // case 0xD000:
+
+        // break;
+
+        case 0xE000:
+            switch(opcode & 0x00FF) {
+                case 0x009E:
+                    if (keys[registers[(operand & 0x0F00) >> 8]] != 0) {
+                        program_counter += 4;
+                    } else {
+                        program_counter += 2;
+                    }
+                break;
+
+                case 0x00A1:
+                    if (keys[registers[(operand & 0x0F00) >> 8]] == 0) {
+                        program_counter += 4;
+                    } else {
+                        program_counter += 2;
+                    }                
+                break;
+
+                default:
+                    std::cout << "Unknown opcode: " << std::hex << opcode << std::endl;
+                    break;
+            }
+        break;
+
+        case 0xF000:
+            switch(opcode & 0x00FF) {
+                case 0x0007:
+                break;
+
+                case 0x000A:
+                break;
+
+                case 0x0015:
+                break;
+
+                case 0x0018:
+                break;
+
+                case 0x001E:
+                break;
+
+                case 0x0029:
+                break;
+
+                case 0x0033:
+                break;
+
+                case 0x0055:
+                break;
+
+                
+            }
+
+        break;
+
         default:
             std::cout << "Unknown opcode: " << std::hex << opcode << std::endl;
+            break;
     }
 
     if (delay_timer > 0) {
