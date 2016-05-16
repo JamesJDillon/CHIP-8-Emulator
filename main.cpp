@@ -20,6 +20,7 @@ private:
     unsigned short stack_pointer;
     unsigned char keys[16];
 public:
+    void cycle();
     void print_mem();
     void load_ROM(std::string);
     void initialize();
@@ -72,6 +73,9 @@ void Chip8::initialize() {
     index = 0;
     stack_pointer = 0;
 
+    sound_timer = 0;
+    delay_timer = 0;
+
     for (size_t i = 0; i < (sizeof(memory) / sizeof(memory[0])); i++) {
         memory[i] = 0;
         //std::cout << +memory[i] << std::endl;
@@ -86,11 +90,56 @@ void Chip8::initialize() {
     } 
 }
 
+void Chip8::cycle() {
+    opcode = memory[program_counter] << 8 | memory[program_counter + 1];
+
+    std::cout << std::hex << opcode << std::endl;
+    switch(opcode & 0xF000) {
+
+        case
+
+
+        case 0x2000:
+            stack[stack_pointer] = program_counter;
+            stack_pointer++;
+            program_counter = opcode & 0x0FF;
+        break;
+        case 0x6000:
+            //std::cout << ((opcode & 0x0F00) >> 8) << std::endl;
+            memory[(opcode & 0x0F00) >> 8] = (opcode & 0x00FF);
+            program_counter += 2;
+            //registers[(opcode & 0x0F00) >> 8]
+        break;
+        case 0xA000:
+            index = opcode & 0x0FFF;
+            program_counter += 2;
+        break;
+
+        default:
+            std::cout << "Unknown opcode: " << std::hex << opcode << std::endl;
+    }
+
+    if (delay_timer > 0) {
+        delay_timer--;
+    }
+
+    if (sound_timer > 0) {
+        if (sound_timer == 1) {
+            std::cout << "BEEP!" << std::endl;
+        }
+        sound_timer--;
+    }
+}
+
 
 int main()
 {
     Chip8 chip;
     chip.initialize();
     chip.load_ROM("PONG");
+
+    for (int i = 0; i < 20; i++) {
+        chip.cycle();
+    }
     //chip.print_mem();
 }
