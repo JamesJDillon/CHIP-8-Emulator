@@ -6,6 +6,7 @@
 
 class Chip8 {
 private:
+    bool drawFlag;
     unsigned short opcode;
     //Chip8 has 4k memory.
     unsigned char memory[4096];
@@ -20,11 +21,20 @@ private:
     unsigned short stack_pointer;
     unsigned char keys[16];
 public:
+    void clearScreen();
     void cycle();
     void print_mem();
     void load_ROM(std::string);
     void initialize();
 };
+
+void Chip8::clearScreen() {
+    for (size_t i = 0; i < (sizeof(graphics) / sizeof(graphics[0])); i++) {
+        graphics[i] = 0;
+    }
+
+    std::cout << "Screen cleared." << std::endl;
+}
 
 void Chip8::print_mem() {
     for (size_t i = 0; i < (sizeof(memory) / sizeof(memory[0])); i++) {
@@ -96,19 +106,68 @@ void Chip8::cycle() {
     std::cout << std::hex << opcode << std::endl;
     switch(opcode & 0xF000) {
 
-        case
+        case 0x0000:
+            switch (opcode & 0x000F) {
+                case 0x0000:
+                    clearScreen();
+                    drawFlag = true;
+                    program_counter += 2;
+                break;
 
+                case 0x000E:
+                    stack_pointer--;
+                    program_counter = stack[stack_pointer];
+                    program_counter += 2;
+                break;
+
+                default:
+                    std::cout << "Unknown opcode: " << opcode << std::endl;
+            }
+
+        case 0x1000:
+            program_counter = opcode & 0x0FFF;
+        break;
 
         case 0x2000:
             stack[stack_pointer] = program_counter;
             stack_pointer++;
-            program_counter = opcode & 0x0FF;
+            program_counter = opcode & 0x0FFF;
         break;
+
+        case 0x3000:
+            if (registers[(opcode & 0x0F00) >> 8] == (opcode & 0x00FF)) {
+                program_counter += 4;
+            } else {
+                program_counter += 2;
+            }
+        break;
+
+        case 0x4000:
+            if (registers[(opcode & 0x0F00) >> 8] != (opcode & 0x00FF)) {
+                program_counter += 4;
+            } else {
+                program_counter += 2;
+            }           
+        break;
+
+        case 0x5000:
+            if (registers[(opcode & 0x0F00) >> 8] == registers[(opcode & 0x00F0) >> 4]) {
+                program_counter += 4;
+            } else {
+                program_counter += 2;
+            }
+        break;
+
         case 0x6000:
             //std::cout << ((opcode & 0x0F00) >> 8) << std::endl;
             memory[(opcode & 0x0F00) >> 8] = (opcode & 0x00FF);
             program_counter += 2;
             //registers[(opcode & 0x0F00) >> 8]
+        break;
+
+        case 0x7000:
+            memory[(opcode & 0x0F00) >> 8] = memory[(opcode & 0x0F00) >> 8] + memory[(opcode & 0x00FF)];
+            program_counter += 2;
         break;
         case 0xA000:
             index = opcode & 0x0FFF;
