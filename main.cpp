@@ -3,8 +3,11 @@
 #include <string>
 #include <cstdio>
 #include <cstdlib>
+#include <SFML/Graphics.hpp>
 #include <math.h>
-#include <SDL/SDL.h>
+#include <ncurses.h>
+#include <unistd.h>
+
 
 class Chip8 {
 private:
@@ -23,6 +26,8 @@ private:
     unsigned short stack_pointer;
     unsigned char keys[16];
 public:
+    void setDrawFlag();
+    // sf::Uint8* getPixels();
     unsigned char *get_graphics();
     bool getDrawFlag();
     void clearScreen();
@@ -32,12 +37,19 @@ public:
     void initialize();
 };
 
+
+
+
 unsigned char* Chip8::get_graphics() {
     return graphics;
 }
 
 bool Chip8::getDrawFlag() {
     return drawFlag;
+}
+
+void Chip8::setDrawFlag() {
+    drawFlag = false;
 }
 
 void Chip8::clearScreen() {
@@ -48,11 +60,6 @@ void Chip8::clearScreen() {
     std::cout << "Screen cleared." << std::endl;
 }
 
-void Chip8::print_mem() {
-    for (size_t i = 0; i < (sizeof(memory) / sizeof(memory[0])); i++) {
-        std::cout << std::hex << memory[i] << std::endl;
-    }
-}
 
 void Chip8::load_ROM(std::string filename) {
     std::cout << filename << std::endl;
@@ -97,6 +104,8 @@ void Chip8::initialize() {
 
     sound_timer = 0;
     delay_timer = 0;
+
+    drawFlag = true;
 
     for (size_t i = 0; i < (sizeof(memory) / sizeof(memory[0])); i++) {
         memory[i] = 0;
@@ -430,60 +439,69 @@ void Chip8::cycle() {
     }
 }
 
+void printToCoordinates(int x, int y, const std::string& text)
+{
+    printf("\033[%d;%dH%s\n", x, x, text.c_str());
+}
 
 int main()
 {
+    sf::RenderWindow window(sf::VideoMode(640, 320), "CHIP-8");
+    //window.setFramerateLimit(10);
 
-    SDL_Init(SDL_INIT_EVERYTHING);
-    SDL_Quit();
+    Chip8 chip;
+    chip.initialize();
+    chip.load_ROM("maze.ch8");
+
+    while (window.isOpen())
+    {
+        chip.cycle();
+
+        sf::Event event;
+        while (window.pollEvent(event))
+        {
+            if (event.type == sf::Event::Closed)
+                window.close();
+        }
+
+        window.clear();
+
+        if (chip.getDrawFlag()) {
+            unsigned char* gfx = chip.get_graphics();
+
+            for (int i = 0; i < (64 * 32); i++) {
+                sf::RectangleShape rectangle;
+                rectangle.setSize(sf::Vector2f(10, 10));
+
+                int x = (i % 64);
+                int y = (int)floor(i / 64);
+
+                if (gfx[i] == 0) {
+                    rectangle.setFillColor(sf::Color::Black);
+                } else {
+                    rectangle.setFillColor(sf::Color::White);
+                }
+
+                rectangle.setPosition(x * 10, y * 10);
+                window.draw(rectangle);
+                chip.setDrawFlag();
+                //usleep(10);
+            }
+        }
+
+        // for (int x = 0; x < 500; x += 50) {
+        //     for (int y = 0; y < 500; y += 50) {
+        //         sf::RectangleShape rectangle;
+        //         rectangle.setSize(sf::Vector2f(50, 50));
+        //         rectangle.setPosition(x, y);
+        //         rectangle.setFillColor(sf::Color(rand() % 255, rand() % 255, rand() % 255));
+        //         window.draw(rectangle);
+
+        //     }
+        // }
+
+        window.display();
+    }
 
     return 0;
-    // sf::RenderWindow window(sf::VideoMode(500, 500), "CHIP-8");
-
-
-    // Chip8 chip;
-    // chip.initialize();
-    // chip.load_ROM("PONG");
-
-    // while (window.isOpen()) {
-    //     sf::Event event;
-
-    //     while (window.pollEvent(event)) {
-    //         if (event.type == sf::Event::Closed) {
-    //             window.close();
-    //         }
-    //     }
-
-    //     if (chip.getDrawFlag()) {
-    //         std::cout << "Draw called" << std::endl;
-    //         unsigned char* gfx = chip.get_graphics();
-
-    //         for (int i = 0; i < 64 * 32; i++) {
-    //             int x = (i % 64);
-    //             int y = (int)floor(i / 64);
-
-    //             sf::RectangleShape rect(sf::Vector2f(x, y));
-    //             rect.setSize(sf::Vector2f(20, 20));
-
-    //             if (gfx[i] == 1) {
-    //                 rect.setFillColor(sf::Color::White);
-    //             } else {
-    //                 rect.setFillColor(sf::Color::White);
-    //             }
-    //             // sf::RectangleShape rectangle(sf::Vector2f(120, 50));
-
-    //             // // change the size to 100x100
-    //             // rectangle.setSize(sf::Vector2f(100, 100));
-    //             window.draw(rect);
-    //         }
-    //         //drawGraphics();
-    //     }
-
-    //     chip.cycle();
-
-    // }
-
-
-    // return 0;
-
 }
