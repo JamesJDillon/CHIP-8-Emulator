@@ -31,10 +31,6 @@ unsigned char chip8_fontset[80] =
 };
 
 
-
-
-
-
 class Chip8 {
 private:
     bool drawFlag;
@@ -44,7 +40,7 @@ private:
     unsigned char registers[16];
     unsigned short index;
     unsigned short program_counter;
-    //The screen is 2048 pixels.
+    //The screen is 2048 (64 * 32) pixels.
     unsigned char graphics[64][32];
     unsigned char delay_timer;
     unsigned char sound_timer;
@@ -52,7 +48,9 @@ private:
     unsigned short stack_pointer;
     unsigned char keys[16];
 public:
+    //Used to set keys[char] = int
     void setKey(char, int);
+    //draws the screen.
     void render();
     bool getDrawFlag();
     void clearScreen();
@@ -69,16 +67,20 @@ void Chip8::setKey(char code, int set) {
 }
 
 void Chip8::render() {
+    //For the entire height/width of the display:
     for (int y = 0; y < 32; y++) {
         for (int x = 0; x < 64; x++) {
+            //Create a rectangle.
             sf::RectangleShape rect;
 
+            //If the value at this location is 0, color the rect black. Else color white.
             if (graphics[x][y] == 0) {
                 rect.setFillColor(sf::Color::Black);
             } else {
                 rect.setFillColor(sf::Color::White);
             }
 
+            //Because the screen is 640x320, times position by 10 (as rect will be 10 pixels long.)
             rect.setPosition(x * 10, y * 10);
             rect.setSize(sf::Vector2f(10, 10));
             window.draw(rect);
@@ -93,7 +95,6 @@ void Chip8::render() {
 bool Chip8::getDrawFlag() {
     return drawFlag;
 }
-
 
 void Chip8::clearScreen() {
 
@@ -144,14 +145,14 @@ void Chip8::load_ROM(std::string filename) {
 
 void Chip8::initialize() {
     program_counter = 0x200;
-    opcode = 0;
-    index = 0;
-    stack_pointer = 0;
+    opcode          = 0;
+    index           = 0;
+    stack_pointer   = 0;
 
-    sound_timer = 0;
-    delay_timer = 0;
+    sound_timer     = 0;
+    delay_timer     = 0;
 
-    drawFlag = true;
+    drawFlag        = true;
 
     for (size_t i = 0; i < (sizeof(memory) / sizeof(memory[0])); i++) {
         memory[i] = 0;
@@ -512,13 +513,13 @@ void Chip8::cycle() {
 
 int main()
 {
-    window.setFramerateLimit(10);
+    //window.setFramerateLimit(10);
 
 
 
     Chip8 chip;
     chip.initialize();
-    chip.load_ROM("maze.ch8");
+    chip.load_ROM("PONG");
 
     while (window.isOpen())
     {
@@ -610,7 +611,7 @@ int main()
         }
 
 
-        usleep(30000);
+        //usleep(30000);
     }
 
     return 0;
