@@ -8,6 +8,32 @@
 #include <ncurses.h>
 #include <unistd.h>
 
+sf::RenderWindow window(sf::VideoMode(640, 320), "CHIP-8");
+
+unsigned char chip8_fontset[80] =
+{ 
+    0xF0, 0x90, 0x90, 0x90, 0xF0, //0
+    0x20, 0x60, 0x20, 0x20, 0x70, //1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, //2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, //3
+    0x90, 0x90, 0xF0, 0x10, 0x10, //4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, //5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, //6
+    0xF0, 0x10, 0x20, 0x40, 0x40, //7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, //8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, //9
+    0xF0, 0x90, 0xF0, 0x90, 0x90, //A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, //B
+    0xF0, 0x80, 0x80, 0x80, 0xF0, //C
+    0xE0, 0x90, 0x90, 0x90, 0xE0, //D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, //E
+    0xF0, 0x80, 0xF0, 0x80, 0x80  //F
+};
+
+
+
+
+
 
 class Chip8 {
 private:
@@ -19,16 +45,15 @@ private:
     unsigned short index;
     unsigned short program_counter;
     //The screen is 2048 pixels.
-    unsigned char graphics[64 * 32];
+    unsigned char graphics[64][32];
     unsigned char delay_timer;
     unsigned char sound_timer;
     unsigned short stack[16];
     unsigned short stack_pointer;
     unsigned char keys[16];
 public:
-    void setDrawFlag();
-    // sf::Uint8* getPixels();
-    unsigned char *get_graphics();
+    void setKey(char, int);
+    void render();
     bool getDrawFlag();
     void clearScreen();
     void cycle();
@@ -38,23 +63,44 @@ public:
 };
 
 
-
-
-unsigned char* Chip8::get_graphics() {
-    return graphics;
+void Chip8::setKey(char code, int set) {
+    keys[code] = set;
+    std::cout << "Key: " << std::hex << code << "set to: " << set << std::endl;
 }
+
+void Chip8::render() {
+    for (int y = 0; y < 32; y++) {
+        for (int x = 0; x < 64; x++) {
+            sf::RectangleShape rect;
+
+            if (graphics[x][y] == 0) {
+                rect.setFillColor(sf::Color::Black);
+            } else {
+                rect.setFillColor(sf::Color::White);
+            }
+
+            rect.setPosition(x * 10, y * 10);
+            rect.setSize(sf::Vector2f(10, 10));
+            window.draw(rect);
+        }
+    }
+
+    drawFlag = false;
+}
+
+
 
 bool Chip8::getDrawFlag() {
     return drawFlag;
 }
 
-void Chip8::setDrawFlag() {
-    drawFlag = false;
-}
 
 void Chip8::clearScreen() {
-    for (size_t i = 0; i < (sizeof(graphics) / sizeof(graphics[0])); i++) {
-        graphics[i] = 0;
+
+    for (int x = 0; x < 64; x++) {
+        for (int y = 0; y < 32; y++) {
+            graphics[x][y] = 0;
+        }
     }
 
     std::cout << "Screen cleared." << std::endl;
@@ -112,18 +158,23 @@ void Chip8::initialize() {
         //std::cout << +memory[i] << std::endl;
     }
 
-    for (size_t i = 0; i < (sizeof(graphics) / sizeof(graphics[0])); i++) {
-        graphics[i] = 0;
+    for (int x = 0; x < 64; x++) {
+        for (int y = 0; y < 32; y++) {
+            graphics[x][y] = 0;
+        }
     }
 
-
     for (size_t i = 0; i < (sizeof(registers) / sizeof(registers[0])); i++) {
-        registers[i] = 0;
+        keys[i] = registers[i] = 0;
     } 
 
     for (size_t i = 0; i < (sizeof(stack) / sizeof(stack[0])); i++) {
         stack[i] = 0;
     } 
+
+    for(int i = 0; i < 80; ++i) {
+        memory[i] = chip8_fontset[i];       
+    }
 }
 
 void Chip8::cycle() {
@@ -141,7 +192,7 @@ void Chip8::cycle() {
                 break;
 
                 case 0x000E:
-                    stack_pointer--;
+                    --stack_pointer;
                     program_counter = stack[stack_pointer];
                     program_counter += 2;
                 break;
@@ -157,7 +208,7 @@ void Chip8::cycle() {
 
         case 0x2000:
             stack[stack_pointer] = program_counter;
-            stack_pointer++;
+            ++stack_pointer;
             program_counter = opcode & 0x0FFF;
         break;
 
@@ -187,13 +238,13 @@ void Chip8::cycle() {
 
         case 0x6000:
             //std::cout << ((opcode & 0x0F00) >> 8) << std::endl;
-            memory[(opcode & 0x0F00) >> 8] = (opcode & 0x00FF);
+            registers[(opcode & 0x0F00) >> 8] = opcode & 0x00FF;
             program_counter += 2;
             //registers[(opcode & 0x0F00) >> 8]
         break;
 
         case 0x7000:
-            memory[(opcode & 0x0F00) >> 8] = memory[(opcode & 0x0F00) >> 8] + memory[(opcode & 0x00FF)];
+            registers[(opcode & 0x0F00) >> 8] += opcode & 0x00FF;
             program_counter += 2;
         break;
 
@@ -303,21 +354,33 @@ void Chip8::cycle() {
             for (int yline = 0; yline < height; yline++)
             {
                 pixel = memory[index + yline];
+
+                if (((int)y + (int)yline) >= 32) {
+                    break;
+                }
+
                 for(int xline = 0; xline < 8; xline++)
                 {
+
+
+                    if (((int)x + (int)xline) >= 64) {
+                        break;
+                    }
+
                     if((pixel & (0x80 >> xline)) != 0)
                     {
-                        if(graphics[(x + xline + ((y + yline) * 64))] == 1)
-                        {
-                            registers[0xF] = 1;                                    
+                        if ((graphics[(x + xline)][(y + yline)]) == 1) {
+                            registers[0xF] = 1;
                         }
-                        graphics[x + xline + ((y + yline) * 64)] ^= 1;
+
+                        graphics[(x + xline)][(y + yline)] ^= 1;
                     }
                 }
             }
                         
             drawFlag = true;            
-            program_counter += 2;
+            program_counter += 2;        
+            break;
         }
         break;
 
@@ -382,7 +445,13 @@ void Chip8::cycle() {
                 break;
 
                 case 0x001E:
-                    index = index + registers[(opcode & 0x0F00) >> 8];
+                    if (index + registers[(opcode & 0x0F00) >> 8] > 0xFFF) {
+                        registers[0xF] = 1;
+                    } else {
+                        registers[0xF] = 0;
+                    }
+
+                    index += registers[(opcode & 0x0F00) >> 8];
                     program_counter += 2;
                 break;
 
@@ -399,7 +468,7 @@ void Chip8::cycle() {
                 break;
 
                 case 0x0055:
-                    for (int i = 0; i <= ((opcode & 0x0F00) >> 8); i++) {
+                    for (int i = 0; i <= ((opcode & 0x0F00) >> 8); ++i) {
                         memory[index + i] = registers[i];   
                     }
 
@@ -408,7 +477,7 @@ void Chip8::cycle() {
                 break;
 
                 case 0x0065:
-                    for (int i = 0; i <= ((opcode & 0x0F00) >> 8); i++) {
+                    for (int i = 0; i <= ((opcode & 0x0F00) >> 8); ++i) {
                         registers[i] = memory[index + i];   
                     }
 
@@ -439,15 +508,13 @@ void Chip8::cycle() {
     }
 }
 
-void printToCoordinates(int x, int y, const std::string& text)
-{
-    printf("\033[%d;%dH%s\n", x, x, text.c_str());
-}
+
 
 int main()
 {
-    sf::RenderWindow window(sf::VideoMode(640, 320), "CHIP-8");
-    //window.setFramerateLimit(10);
+    window.setFramerateLimit(10);
+
+
 
     Chip8 chip;
     chip.initialize();
@@ -457,51 +524,96 @@ int main()
     {
         chip.cycle();
 
+        if (chip.getDrawFlag()) {
+            chip.render();
+            window.display();
+            //chip.clearScreen();
+        }
+
         sf::Event event;
         while (window.pollEvent(event))
         {
-            if (event.type == sf::Event::Closed)
+            if (event.type == sf::Event::Closed) {
                 window.close();
-        }
+            }
 
-        window.clear();
-
-        if (chip.getDrawFlag()) {
-            unsigned char* gfx = chip.get_graphics();
-
-            for (int i = 0; i < (64 * 32); i++) {
-                sf::RectangleShape rectangle;
-                rectangle.setSize(sf::Vector2f(10, 10));
-
-                int x = (i % 64);
-                int y = (int)floor(i / 64);
-
-                if (gfx[i] == 0) {
-                    rectangle.setFillColor(sf::Color::Black);
-                } else {
-                    rectangle.setFillColor(sf::Color::White);
+            if (event.type == sf::Event::KeyPressed) {
+                std::cout << "Pressed " << std::endl;
+                if (event.key.code == sf::Keyboard::Num1) {
+                    chip.setKey(1, 1);
+                } else if (event.key.code == sf::Keyboard::Num2) {
+                    chip.setKey(0x2, 1);
+                } else if (event.key.code == sf::Keyboard::Num3) {
+                    chip.setKey(0x3, 1);
+                } else if (event.key.code == sf::Keyboard::Num4) {
+                    chip.setKey(0xC, 1);
+                } else if (event.key.code == sf::Keyboard::Q) {
+                    chip.setKey(0x4, 1);
+                } else if (event.key.code == sf::Keyboard::W) {
+                    chip.setKey(0x5, 1);
+                } else if (event.key.code == sf::Keyboard::E) {
+                    chip.setKey(0x6, 1);
+                } else if (event.key.code == sf::Keyboard::R) {
+                    chip.setKey(0xD, 1);
+                } else if (event.key.code == sf::Keyboard::A) {
+                    chip.setKey(0x7, 1);
+                } else if (event.key.code == sf::Keyboard::S) {
+                    chip.setKey(0x8, 1);
+                } else if (event.key.code == sf::Keyboard::D) {
+                    chip.setKey(0x9, 1);
+                } else if (event.key.code == sf::Keyboard::F) {
+                    chip.setKey(0xE, 1);
+                } else if (event.key.code == sf::Keyboard::Z) {
+                    chip.setKey(0xA, 1);
+                } else if (event.key.code == sf::Keyboard::X) {
+                    chip.setKey(0x0, 1);
+                } else if (event.key.code == sf::Keyboard::C) {
+                    chip.setKey(0xB, 1);
+                } else if (event.key.code == sf::Keyboard::V) {
+                    chip.setKey(0xF, 1);
                 }
-
-                rectangle.setPosition(x * 10, y * 10);
-                window.draw(rectangle);
-                chip.setDrawFlag();
-                //usleep(10);
+            } else if (event.type == sf::Event::KeyReleased) {
+                if (event.key.code == sf::Keyboard::Num1) {
+                    chip.setKey(0x1, 0);
+                } else if (event.key.code == sf::Keyboard::Num2) {
+                    chip.setKey(0x2, 0);
+                } else if (event.key.code == sf::Keyboard::Num3) {
+                    chip.setKey(0x3, 0);
+                } else if (event.key.code == sf::Keyboard::Num4) {
+                    chip.setKey(0xC, 0);
+                } else if (event.key.code == sf::Keyboard::Q) {
+                    chip.setKey(0x4, 0);
+                } else if (event.key.code == sf::Keyboard::W) {
+                    chip.setKey(0x5, 0);
+                } else if (event.key.code == sf::Keyboard::E) {
+                    chip.setKey(0x6, 0);
+                } else if (event.key.code == sf::Keyboard::R) {
+                    chip.setKey(0xD, 0);
+                } else if (event.key.code == sf::Keyboard::A) {
+                    chip.setKey(0x7, 0);
+                } else if (event.key.code == sf::Keyboard::S) {
+                    chip.setKey(0x8, 0);
+                } else if (event.key.code == sf::Keyboard::D) {
+                    chip.setKey(0x9, 0);
+                } else if (event.key.code == sf::Keyboard::F) {
+                    chip.setKey(0xE, 0);
+                } else if (event.key.code == sf::Keyboard::Z) {
+                    chip.setKey(0xA, 0);
+                } else if (event.key.code == sf::Keyboard::X) {
+                    chip.setKey(0x0, 0);
+                } else if (event.key.code == sf::Keyboard::C) {
+                    chip.setKey(0xB, 0);
+                } else if (event.key.code == sf::Keyboard::V) {
+                    chip.setKey(0xF, 0);
+                }
             }
         }
 
-        // for (int x = 0; x < 500; x += 50) {
-        //     for (int y = 0; y < 500; y += 50) {
-        //         sf::RectangleShape rectangle;
-        //         rectangle.setSize(sf::Vector2f(50, 50));
-        //         rectangle.setPosition(x, y);
-        //         rectangle.setFillColor(sf::Color(rand() % 255, rand() % 255, rand() % 255));
-        //         window.draw(rectangle);
 
-        //     }
-        // }
-
-        window.display();
+        usleep(30000);
     }
 
     return 0;
 }
+
+
