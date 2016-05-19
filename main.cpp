@@ -1,10 +1,6 @@
 #include <iostream>
 #include <string>
-#include <cstdio>
-#include <cstdlib>
 #include <SFML/Graphics.hpp>
-#include <math.h>
-#include <unistd.h>
 
 sf::RenderWindow window(sf::VideoMode(640, 320), "CHIP-8");
 
@@ -47,6 +43,8 @@ private:
     unsigned short stack_pointer;
     unsigned char keys[16];
 public:
+    void keyRelease(sf::Event);
+    void keyPress(sf::Event);
     //Used to set keys[char] = int
     void setKey(char, int);
     //draws the screen.
@@ -59,6 +57,50 @@ public:
 };
 
 
+void Chip8::keyPress(sf::Event key) {
+    if (key.key.code == sf::Keyboard::Num1) { keys[0x1] = 1; }
+    if (key.key.code == sf::Keyboard::Num2) { keys[0x2] = 1; }
+    if (key.key.code == sf::Keyboard::Num3) { keys[0x3] = 1; }
+    if (key.key.code == sf::Keyboard::Num4) { keys[0xC] = 1; }
+
+    if (key.key.code == sf::Keyboard::Q)    { keys[0x4] = 1; }
+    if (key.key.code == sf::Keyboard::W)    { keys[0x5] = 1; }
+    if (key.key.code == sf::Keyboard::E)    { keys[0x6] = 1; }
+    if (key.key.code == sf::Keyboard::R)    { keys[0xD] = 1; }
+
+    if (key.key.code == sf::Keyboard::A)    { keys[0x7] = 1; }
+    if (key.key.code == sf::Keyboard::S)    { keys[0x8] = 1; }
+    if (key.key.code == sf::Keyboard::D)    { keys[0x9] = 1; }
+    if (key.key.code == sf::Keyboard::F)    { keys[0xE] = 1; }
+
+    if (key.key.code == sf::Keyboard::Z)    { keys[0xA] = 1; }
+    if (key.key.code == sf::Keyboard::X)    { keys[0x0] = 1; }
+    if (key.key.code == sf::Keyboard::C)    { keys[0xB] = 1; }
+    if (key.key.code == sf::Keyboard::V)    { keys[0xF] = 1; }
+}   
+
+void Chip8::keyRelease(sf::Event key) {
+    if (key.key.code == sf::Keyboard::Num1) { keys[0x1] = 0; }
+    if (key.key.code == sf::Keyboard::Num2) { keys[0x2] = 0; }
+    if (key.key.code == sf::Keyboard::Num3) { keys[0x3] = 0; }
+    if (key.key.code == sf::Keyboard::Num4) { keys[0xC] = 0; }
+
+    if (key.key.code == sf::Keyboard::Q)    { keys[0x4] = 0; }
+    if (key.key.code == sf::Keyboard::W)    { keys[0x5] = 0; }
+    if (key.key.code == sf::Keyboard::E)    { keys[0x6] = 0; }
+    if (key.key.code == sf::Keyboard::R)    { keys[0xD] = 0; }
+
+    if (key.key.code == sf::Keyboard::A)    { keys[0x7] = 0; }
+    if (key.key.code == sf::Keyboard::S)    { keys[0x8] = 0; }
+    if (key.key.code == sf::Keyboard::D)    { keys[0x9] = 0; }
+    if (key.key.code == sf::Keyboard::F)    { keys[0xE] = 0; }
+
+    if (key.key.code == sf::Keyboard::Z)    { keys[0xA] = 0; }
+    if (key.key.code == sf::Keyboard::X)    { keys[0x0] = 0; }
+    if (key.key.code == sf::Keyboard::C)    { keys[0xB] = 0; }
+    if (key.key.code == sf::Keyboard::V)    { keys[0xF] = 0; }
+}
+
 void Chip8::setKey(char code, int set) {
     keys[code] = set;
     std::cout << "Key: " << std::hex << code << "set to: " << set << std::endl;
@@ -66,8 +108,8 @@ void Chip8::setKey(char code, int set) {
 
 void Chip8::render() {
     //For the entire height/width of the display:
-    for (int y = 0; y < 32; y++) {
-        for (int x = 0; x < 64; x++) {
+    for (int x = 0; x < 64; x++) {
+        for (int y = 0; y < 32; y++) {
             //Create a rectangle.
             sf::RectangleShape rect;
 
@@ -281,12 +323,13 @@ void Chip8::cycle() {
                     program_counter += 2;                    
                 break;
 
-                //0x8xy2.
+                //0x8xy3. register[x] = register[x] XOR register[y]
                 case 0x0003:
                     registers[(opcode & 0x0F00) >> 8] ^= registers[(opcode & 0x00F0) >> 4];
                     program_counter += 2;                    
                 break;
 
+                //0x8x
                 case 0x0004:
                     if(registers[(opcode & 0x00F0) >> 4] > (0xFF - registers[(opcode & 0x0F00) >> 8])) {
                         registers[0xF] = 1;
@@ -529,10 +572,9 @@ void Chip8::cycle() {
 
 int main()
 {
-    //window.setFramerateLimit(10);
     Chip8 chip;
     chip.initialize();
-    chip.load_ROM("INVADERS");
+    chip.load_ROM("PONG");
 
     while (window.isOpen())
     {
@@ -552,78 +594,13 @@ int main()
             }
 
             if (event.type == sf::Event::KeyPressed) {
-                std::cout << "Pressed " << std::endl;
-                if (event.key.code == sf::Keyboard::Num1) {
-                    chip.setKey(1, 1);
-                } else if (event.key.code == sf::Keyboard::Num2) {
-                    chip.setKey(0x2, 1);
-                } else if (event.key.code == sf::Keyboard::Num3) {
-                    chip.setKey(0x3, 1);
-                } else if (event.key.code == sf::Keyboard::Num4) {
-                    chip.setKey(0xC, 1);
-                } else if (event.key.code == sf::Keyboard::Q) {
-                    chip.setKey(0x4, 1);
-                } else if (event.key.code == sf::Keyboard::W) {
-                    chip.setKey(0x5, 1);
-                } else if (event.key.code == sf::Keyboard::E) {
-                    chip.setKey(0x6, 1);
-                } else if (event.key.code == sf::Keyboard::R) {
-                    chip.setKey(0xD, 1);
-                } else if (event.key.code == sf::Keyboard::A) {
-                    chip.setKey(0x7, 1);
-                } else if (event.key.code == sf::Keyboard::S) {
-                    chip.setKey(0x8, 1);
-                } else if (event.key.code == sf::Keyboard::D) {
-                    chip.setKey(0x9, 1);
-                } else if (event.key.code == sf::Keyboard::F) {
-                    chip.setKey(0xE, 1);
-                } else if (event.key.code == sf::Keyboard::Z) {
-                    chip.setKey(0xA, 1);
-                } else if (event.key.code == sf::Keyboard::X) {
-                    chip.setKey(0x0, 1);
-                } else if (event.key.code == sf::Keyboard::C) {
-                    chip.setKey(0xB, 1);
-                } else if (event.key.code == sf::Keyboard::V) {
-                    chip.setKey(0xF, 1);
-                }
+                chip.keyPress(event);
             } else if (event.type == sf::Event::KeyReleased) {
-                if (event.key.code == sf::Keyboard::Num1) {
-                    chip.setKey(0x1, 0);
-                } else if (event.key.code == sf::Keyboard::Num2) {
-                    chip.setKey(0x2, 0);
-                } else if (event.key.code == sf::Keyboard::Num3) {
-                    chip.setKey(0x3, 0);
-                } else if (event.key.code == sf::Keyboard::Num4) {
-                    chip.setKey(0xC, 0);
-                } else if (event.key.code == sf::Keyboard::Q) {
-                    chip.setKey(0x4, 0);
-                } else if (event.key.code == sf::Keyboard::W) {
-                    chip.setKey(0x5, 0);
-                } else if (event.key.code == sf::Keyboard::E) {
-                    chip.setKey(0x6, 0);
-                } else if (event.key.code == sf::Keyboard::R) {
-                    chip.setKey(0xD, 0);
-                } else if (event.key.code == sf::Keyboard::A) {
-                    chip.setKey(0x7, 0);
-                } else if (event.key.code == sf::Keyboard::S) {
-                    chip.setKey(0x8, 0);
-                } else if (event.key.code == sf::Keyboard::D) {
-                    chip.setKey(0x9, 0);
-                } else if (event.key.code == sf::Keyboard::F) {
-                    chip.setKey(0xE, 0);
-                } else if (event.key.code == sf::Keyboard::Z) {
-                    chip.setKey(0xA, 0);
-                } else if (event.key.code == sf::Keyboard::X) {
-                    chip.setKey(0x0, 0);
-                } else if (event.key.code == sf::Keyboard::C) {
-                    chip.setKey(0xB, 0);
-                } else if (event.key.code == sf::Keyboard::V) {
-                    chip.setKey(0xF, 0);
-                }
+                chip.keyRelease(event);
             }
         }
 
-        usleep(30000);
+        //usleep(30000);
     }
 
     return 0;
