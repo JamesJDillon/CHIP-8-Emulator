@@ -46,4 +46,4 @@ Running (example):
 ## Todo:
 
 I think everything's as complete as possible. Maybe I will implement smoother rendering
-in the future to reduce jitter.
+in the future as the jitter can be quite bad.
