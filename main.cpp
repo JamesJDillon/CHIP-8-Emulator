@@ -2,6 +2,10 @@
 #include <string>
 #include <SFML/Graphics.hpp>
 
+//For coloring the error outputs.
+const std::string error("\033[0;31m");
+const std::string reset("\033[0m");
+
 sf::RenderWindow window(sf::VideoMode(640, 320), "CHIP-8");
 
 //The chip8 fontset array I took from some other chip8 emulator.
@@ -28,31 +32,30 @@ unsigned char chip8_fontset[80] =
 
 class Chip8 {
 private:
-    bool drawFlag;
-    unsigned short opcode;
+    bool            drawFlag;
+    unsigned short  opcode;
     //Chip8 has 4k memory.
-    unsigned char memory[4096];
-    unsigned char registers[16];
-    unsigned short index;
-    unsigned short program_counter;
+    unsigned char   memory[4096];
+    unsigned char   registers[16];
+    unsigned short  index;
+    unsigned short  program_counter;
     //The screen is 2048 (64 * 32) pixels.
-    unsigned char graphics[64][32];
-    unsigned char delay_timer;
-    unsigned char sound_timer;
-    unsigned short stack[16];
-    unsigned short stack_pointer;
-    unsigned char keys[16];
+    unsigned char   graphics[64][32];
+    unsigned char   delay_timer;
+    unsigned char   sound_timer;
+    unsigned short  stack[16];
+    unsigned short  stack_pointer;
+    unsigned char   keys[16];
 public:
     void keyRelease(sf::Event);
     void keyPress(sf::Event);
     //Used to set keys[char] = int
-    void setKey(char, int);
     //draws the screen.
     void render();
     bool getDrawFlag();
     void clearScreen();
     void cycle();
-    void load_ROM(std::string);
+    bool load_ROM(std::string);
     void initialize();
 };
 
@@ -101,10 +104,6 @@ void Chip8::keyRelease(sf::Event key) {
     if (key.key.code == sf::Keyboard::V)    { keys[0xF] = 0; }
 }
 
-void Chip8::setKey(char code, int set) {
-    keys[code] = set;
-    std::cout << "Key: " << std::hex << code << "set to: " << set << std::endl;
-}
 
 void Chip8::render() {
     //For the entire height/width of the display:
@@ -140,16 +139,15 @@ void Chip8::clearScreen() {
             graphics[x][y] = 0;
         }
     }
-
-    std::cout << "Screen cleared." << std::endl;
 }
 
-
-void Chip8::load_ROM(std::string filename) {
-    std::cout << filename << std::endl;
-
+bool Chip8::load_ROM(std::string filename) {
     //Open the file in "read and binary" mode.
     FILE *rom = std::fopen(filename.c_str(), "rb");
+
+    if (rom == NULL) {
+        return false;
+    }
 
     //Get the size of the file.
     fseek(rom, 0, SEEK_END);
@@ -164,13 +162,14 @@ void Chip8::load_ROM(std::string filename) {
     //If the buffer is null, malloc messed up somehow.
     if (buff == NULL) {
         std::cout << "ERROR ALLOCATING MEMORY!" << std::endl;
+        return false;
     }
 
     //Read data from rom stream in to buff.
     int result = fread(buff, 1, filesize, rom);
     if (result != filesize) {
         std::cout << "ERROR READING ROM!" << std::endl;
-        return;
+        return false;
     }
 
 
@@ -179,14 +178,20 @@ void Chip8::load_ROM(std::string filename) {
         for (int i = 0; i < filesize; i++) {
             memory[i + 512] = buff[i];
         }
+    } else {
+        std::cout << "ROM too large!" << std::endl;
+        return false;
     }
 
     fclose(rom);
     free(buff);
+
+    return true;
 }
 
 
 void Chip8::initialize() {
+    //0x000 through 0x1FF is reserved for the interpreter.
     program_counter = 0x200;
     opcode          = 0;
     index           = 0;
@@ -226,7 +231,7 @@ void Chip8::cycle() {
     //Fetch the opcode.
     opcode = memory[program_counter] << 8 | memory[program_counter + 1];
 
-    std::cout << std::hex << opcode << std::endl;
+    //std::cout << std::hex << opcode << std::endl;
 
     switch(opcode & 0xF000) {
         case 0x0000:
@@ -329,7 +334,7 @@ void Chip8::cycle() {
                     program_counter += 2;                    
                 break;
 
-                //0x8x
+                //0x8xy4. register[x] += register[y], set register[0xF] to carry.
                 case 0x0004:
                     if(registers[(opcode & 0x00F0) >> 4] > (0xFF - registers[(opcode & 0x0F00) >> 8])) {
                         registers[0xF] = 1;
@@ -341,6 +346,7 @@ void Chip8::cycle() {
                     program_counter += 2;                       
                 break;
 
+                //0x8xy5. register[x] -= register[y], set register[0xF] to NOT carry.
                 case 0x0005:
                     if(registers[(opcode & 0x00F0) >> 4] > (0xFF - registers[(opcode & 0x0F00) >> 8])) {
                         registers[0xF] = 0;
@@ -352,12 +358,14 @@ void Chip8::cycle() {
                     program_counter += 2;                  
                 break;
 
+                //0x8xy6. "Set register[x] = register[x] SHR 1."
                 case 0x0006:
                     registers[0xF] = registers[(opcode & 0x0F00) >> 8] & 0x1;
                     registers[(opcode & 0x0F00) >> 8] >>= 1;
                     program_counter += 2;                   
                 break;
 
+                //0x8xy7. "Set register[x] = register[y] - register[x], set register[F] = NOT borrow."
                 case 0x0007:
                     if(registers[(opcode & 0x0F00) >> 8] > registers[(opcode & 0x00F0) >> 4]) {
                         registers[0xF] = 0;
@@ -369,6 +377,7 @@ void Chip8::cycle() {
                     program_counter += 2;    
                 break;
 
+                //0x8xy8. "Set register[x] = register[x] SHL 1."
                 case 0x000E:
                     registers[0xF] = registers[(opcode & 0x0F00) >> 8] >> 7;
                     registers[(opcode & 0x0F00) >> 8] <<= 1;
@@ -381,6 +390,7 @@ void Chip8::cycle() {
             }
         break;
 
+        //0x9xy0. If register[x] != register[y], skip the instruction.
         case 0x9000:
             if (registers[(opcode & 0x0F00) >> 8] != registers[(opcode & 0x00F0) >> 4]) {
                 program_counter += 4;
@@ -389,20 +399,34 @@ void Chip8::cycle() {
             }
         break;
 
+        //0xAnnn. Set index = nnn.
         case 0xA000:
             index = opcode & 0x0FFF;
             program_counter += 2;
         break;
 
+        //0xBnnn. Jump to location nnn + register[0].
         case 0xB000:
             program_counter = (opcode & 0x0FFF) + registers[0];
         break;
 
+        //0xCxkk. Set register[x] = random byte AND kk.
         case 0xC000:
             registers[(opcode & 0x0F00) >> 8] = (rand() % 0xFF) & (opcode & 0x00FF);
             program_counter += 2;
         break;
 
+        /*
+        0xDxyn.
+        "Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
+
+        The interpreter reads n bytes from memory, starting at the address stored in I. 
+        These bytes are then displayed as sprites on screen at coordinates (Vx, Vy). 
+        Sprites are XORed onto the existing screen. 
+        If this causes any pixels to be erased, VF is set to 1, otherwise it is set to 0. 
+        If the sprite is positioned so part of it is outside the coordinates of the display, 
+        it wraps around to the opposite side of the screen."
+        */
         case 0xD000:
         {
             unsigned short x = registers[(opcode & 0x0F00) >> 8];
@@ -421,7 +445,6 @@ void Chip8::cycle() {
 
                 for(int xline = 0; xline < 8; xline++)
                 {
-
 
                     if (((int)x + (int)xline) >= 64) {
                         break;
@@ -444,8 +467,10 @@ void Chip8::cycle() {
         }
         break;
 
+        //Two operations start with 0xE000.
         case 0xE000:
             switch(opcode & 0x00FF) {
+                //0xEx9E. Skip next instruction if key with value of register[x] is pressed.
                 case 0x009E:
                     if (keys[registers[(opcode & 0x0F00) >> 8]] != 0) {
                         program_counter += 4;
@@ -454,6 +479,7 @@ void Chip8::cycle() {
                     }
                 break;
 
+                //0xExA1. Skip next instruction of key with value of register[x] is not pressed.
                 case 0x00A1:
                     if (keys[registers[(opcode & 0x0F00) >> 8]] == 0) {
                         program_counter += 4;
@@ -468,13 +494,16 @@ void Chip8::cycle() {
             }
         break;
 
+        //9 operations begin with 0xF000.
         case 0xF000:
             switch(opcode & 0x00FF) {
+                //0xFx07. Set register[x] = delay timer value.
                 case 0x0007:
                     registers[(opcode & 0x0F00) >> 8] = delay_timer;
                     program_counter += 2;
                 break;
 
+                //0xFx0A. Waits for keypress, stores that value in register[x].
                 case 0x000A:
                 {
                     bool keyPressed = false;
@@ -494,16 +523,19 @@ void Chip8::cycle() {
                 }
                 break;
 
+                //0xFx15. Sets delay timer = register[x].
                 case 0x0015:
                     delay_timer = registers[(opcode & 0x0F00) >> 8];
                     program_counter += 2;
                 break;
 
+                //0xFx18. Sets sound time = register[x].
                 case 0x0018:
                     sound_timer = registers[(opcode & 0x0F00) >> 8];
                     program_counter += 2;
                 break;
 
+                //0xFx1E. Set index += register[x].
                 case 0x001E:
                     if (index + registers[(opcode & 0x0F00) >> 8] > 0xFFF) {
                         registers[0xF] = 1;
@@ -515,18 +547,22 @@ void Chip8::cycle() {
                     program_counter += 2;
                 break;
 
+                //0xFx29. "Set I = location of sprite for digit Vx."
                 case 0x0029:
                     index = registers[(opcode & 0x0F00) >> 8] * 0x5;
                     program_counter += 2;
                 break;
 
+                //0xFx33. "Store BCD representation of Vx in memory locations I, I+1, and I+2."
                 case 0x0033:
                     memory[index] = registers[(opcode & 0x0F00) >> 8] / 100;
                     memory[index + 1] = (registers[(opcode & 0x0F00) >> 8] / 10) % 10;
+
                     memory[index + 2] = (registers[(opcode & 0x0F00) >> 8] % 100) % 10;                 
                     program_counter += 2;
                 break;
 
+                //0xFx55. Stores registers[0] through register[x] in memory (starting at location index.)
                 case 0x0055:
                     for (int i = 0; i <= ((opcode & 0x0F00) >> 8); ++i) {
                         memory[index + i] = registers[i];   
@@ -536,6 +572,7 @@ void Chip8::cycle() {
                     program_counter += 2;
                 break;
 
+                //0xFx65. Read registers[0] through register[x] from memory starting at location index.
                 case 0x0065:
                     for (int i = 0; i <= ((opcode & 0x0F00) >> 8); ++i) {
                         registers[i] = memory[index + i];   
@@ -556,6 +593,7 @@ void Chip8::cycle() {
             break;
     }
 
+    //Decremet the delay_timer after every cycle.
     if (delay_timer > 0) {
         delay_timer--;
     }
@@ -570,20 +608,33 @@ void Chip8::cycle() {
 
 
 
-int main()
+int main(int argc, char* argv[])
 {
+
+    if (argc < 2) {
+        std::cerr << error << "Error!" << reset << std::endl;
+        std::cerr << error << "Usage:    ./main filename" << reset << std::endl;
+        std::cerr << error << "Example:  ./main PONG" << reset << std::endl;
+        return 1;
+    }
+
     Chip8 chip;
     chip.initialize();
-    chip.load_ROM("PONG");
+
+    if (!chip.load_ROM(argv[1])) {
+        std::cerr << error << "Invalid ROM filename. Please try again." << reset << std::endl;
+        return 1;
+    }
+
 
     while (window.isOpen())
     {
         chip.cycle();
 
+        //The screen needs drawn.
         if (chip.getDrawFlag()) {
             chip.render();
             window.display();
-            //chip.clearScreen();
         }
 
         sf::Event event;
@@ -599,8 +650,6 @@ int main()
                 chip.keyRelease(event);
             }
         }
-
-        //usleep(30000);
     }
 
     return 0;
