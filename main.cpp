@@ -1,15 +1,14 @@
 #include <iostream>
-#include <algorithm>
 #include <string>
 #include <cstdio>
 #include <cstdlib>
 #include <SFML/Graphics.hpp>
 #include <math.h>
-#include <ncurses.h>
 #include <unistd.h>
 
 sf::RenderWindow window(sf::VideoMode(640, 320), "CHIP-8");
 
+//The chip8 fontset array I took from some other chip8 emulator.
 unsigned char chip8_fontset[80] =
 { 
     0xF0, 0x90, 0x90, 0x90, 0xF0, //0
@@ -55,7 +54,6 @@ public:
     bool getDrawFlag();
     void clearScreen();
     void cycle();
-    void print_mem();
     void load_ROM(std::string);
     void initialize();
 };
@@ -90,14 +88,11 @@ void Chip8::render() {
     drawFlag = false;
 }
 
-
-
 bool Chip8::getDrawFlag() {
     return drawFlag;
 }
 
 void Chip8::clearScreen() {
-
     for (int x = 0; x < 64; x++) {
         for (int y = 0; y < 32; y++) {
             graphics[x][y] = 0;
@@ -111,20 +106,25 @@ void Chip8::clearScreen() {
 void Chip8::load_ROM(std::string filename) {
     std::cout << filename << std::endl;
 
+    //Open the file in "read and binary" mode.
     FILE *rom = std::fopen(filename.c_str(), "rb");
 
+    //Get the size of the file.
     fseek(rom, 0, SEEK_END);
     long filesize = ftell(rom);
     rewind(rom);
 
     std::cout << "Filesize: " << filesize << std::endl;
 
+    //Mate a char buffer the size of the file.
     char *buff = (char*)malloc(sizeof(char) * filesize);
 
+    //If the buffer is null, malloc messed up somehow.
     if (buff == NULL) {
         std::cout << "ERROR ALLOCATING MEMORY!" << std::endl;
     }
 
+    //Read data from rom stream in to buff.
     int result = fread(buff, 1, filesize, rom);
     if (result != filesize) {
         std::cout << "ERROR READING ROM!" << std::endl;
@@ -132,6 +132,7 @@ void Chip8::load_ROM(std::string filename) {
     }
 
 
+    //If filesize is less than 4096 (minus the 512 bytes that the rom can't be stored in)
     if (filesize < (4096 - 512)) {
         for (int i = 0; i < filesize; i++) {
             memory[i + 512] = buff[i];
@@ -154,6 +155,7 @@ void Chip8::initialize() {
 
     drawFlag        = true;
 
+    //Initialize every array to zero.
     for (size_t i = 0; i < (sizeof(memory) / sizeof(memory[0])); i++) {
         memory[i] = 0;
         //std::cout << +memory[i] << std::endl;
@@ -179,19 +181,22 @@ void Chip8::initialize() {
 }
 
 void Chip8::cycle() {
+    //Fetch the opcode.
     opcode = memory[program_counter] << 8 | memory[program_counter + 1];
 
     std::cout << std::hex << opcode << std::endl;
-    switch(opcode & 0xF000) {
 
+    switch(opcode & 0xF000) {
         case 0x0000:
             switch (opcode & 0x000F) {
+                //0x00E0. Clear the displays.
                 case 0x0000:
                     clearScreen();
                     drawFlag = true;
                     program_counter += 2;
                 break;
 
+                //0x00EE. Return from a subroutine.
                 case 0x000E:
                     --stack_pointer;
                     program_counter = stack[stack_pointer];
@@ -203,16 +208,19 @@ void Chip8::cycle() {
             }
         break;
 
+        //0x1nnn. Jump to location nnn.
         case 0x1000:
             program_counter = opcode & 0x0FFF;
         break;
 
+        //0x2nnn. Calls subroutine at nnn.
         case 0x2000:
             stack[stack_pointer] = program_counter;
-            ++stack_pointer;
+            stack_pointer++;
             program_counter = opcode & 0x0FFF;
         break;
 
+        //0x3xkk. If registers[x] == kk then skip next instruction.
         case 0x3000:
             if (registers[(opcode & 0x0F00) >> 8] == (opcode & 0x00FF)) {
                 program_counter += 4;
@@ -221,6 +229,7 @@ void Chip8::cycle() {
             }
         break;
 
+        //0x4xkk. If registers[x] != kk, then skip next instruction.
         case 0x4000:
             if (registers[(opcode & 0x0F00) >> 8] != (opcode & 0x00FF)) {
                 program_counter += 4;
@@ -229,6 +238,7 @@ void Chip8::cycle() {
             }           
         break;
 
+        //0x5xy0. If registers[x] == registers[y], skip next instruction.
         case 0x5000:
             if (registers[(opcode & 0x0F00) >> 8] == registers[(opcode & 0x00F0) >> 4]) {
                 program_counter += 4;
@@ -237,35 +247,41 @@ void Chip8::cycle() {
             }
         break;
 
+        //0x6xkk. Puts kk in to register x. registers[x] == kk;
         case 0x6000:
-            //std::cout << ((opcode & 0x0F00) >> 8) << std::endl;
             registers[(opcode & 0x0F00) >> 8] = opcode & 0x00FF;
             program_counter += 2;
-            //registers[(opcode & 0x0F00) >> 8]
         break;
 
+        //0x7xkk. "Set Vx = Vx + kk". Adds kk to register[x], then stores result in registers[x].
         case 0x7000:
             registers[(opcode & 0x0F00) >> 8] += opcode & 0x00FF;
             program_counter += 2;
         break;
 
+        //0x8000. There are 9 instructions that begin with 0x8000.
         case 0x8000:
+            //Get last byte. 
             switch (opcode & 0x000F) {
+                //0x8xy0. Set registers[x] = registers[y].
                 case 0x0000:
                     registers[(opcode & 0x0F00) >> 8] = registers[(opcode & 0x00F0) >> 4];
                     program_counter += 2;
                 break;
 
+                //0x8xy1. Set register[x] = register[x] |(OR) register[y].
                 case 0x0001:
                     registers[(opcode & 0x0F00) >> 8] |= registers[(opcode & 0x00F0) >> 4];
                     program_counter += 2;                    
                 break;
 
+                //0x8xy2. Same as before, except this time AND.
                 case 0x0002:
                     registers[(opcode & 0x0F00) >> 8] &= registers[(opcode & 0x00F0) >> 4];
                     program_counter += 2;                    
                 break;
 
+                //0x8xy2.
                 case 0x0003:
                     registers[(opcode & 0x0F00) >> 8] ^= registers[(opcode & 0x00F0) >> 4];
                     program_counter += 2;                    
@@ -503,7 +519,7 @@ void Chip8::cycle() {
 
     if (sound_timer > 0) {
         if (sound_timer == 1) {
-            std::cout << "BEEP!" << std::endl;
+            std::cout << "\aBEEP!" << std::endl;
         }
         sound_timer--;
     }
@@ -514,12 +530,9 @@ void Chip8::cycle() {
 int main()
 {
     //window.setFramerateLimit(10);
-
-
-
     Chip8 chip;
     chip.initialize();
-    chip.load_ROM("PONG");
+    chip.load_ROM("INVADERS");
 
     while (window.isOpen())
     {
@@ -610,8 +623,7 @@ int main()
             }
         }
 
-
-        //usleep(30000);
+        usleep(30000);
     }
 
     return 0;
